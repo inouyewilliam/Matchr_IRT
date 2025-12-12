@@ -1,0 +1,5 @@
+{
+  "name": "IRT Simulator",
+  "description": "Interactive recruitment capacity simulator to model staffing needs based on hiring demand curves.",
+  "requestFramePermissions": []
+}
