@@ -4,52 +4,56 @@ export const calculateScenarioMetrics = (
   scenario: Scenario,
   config: GlobalConfig
 ): SimulationResult => {
-  // Ensure we have exactly weeksToSimulate data points
-  let activeWeeks = scenario.demand.slice(0, config.weeksToSimulate);
-  if (activeWeeks.length < config.weeksToSimulate) {
-      activeWeeks = [...activeWeeks, ...Array(config.weeksToSimulate - activeWeeks.length).fill(0)];
+  const { hiringDuration, rampUpWeeks } = config;
+  const totalWeeks = hiringDuration + rampUpWeeks;
+
+  // Prepare the hiring demand array (ensuring it matches hiringDuration)
+  let hiringDemand = [...scenario.demand];
+  if (hiringDemand.length < hiringDuration) {
+    hiringDemand = [...hiringDemand, ...Array(hiringDuration - hiringDemand.length).fill(0)];
+  } else {
+    hiringDemand = hiringDemand.slice(0, hiringDuration);
   }
-  
-  // Capacity Calculation (Scenario View)
+
+  // Demand for resource calculation during ramp-up (look ahead to the first hiring week)
+  const rampResourceDemand = hiringDemand[0] || 0;
+
   const tpMaxHires = (scenario.currentTalentPartners || 0) * config.tpCapacityPerWeek;
-  
-  // For individual scenario view, we assume full global sourcer pool is available 
   const sourcerMaxHires = (config.totalSourcers * config.sourcerCapacityPerWeek) / config.candidatesPerHireBenchmark;
-  
   const actualCapacity = Math.min(tpMaxHires, sourcerMaxHires);
   const limitingFactor = tpMaxHires < sourcerMaxHires ? 'Talent Partners' : (sourcerMaxHires < tpMaxHires ? 'Sourcers' : 'Balanced');
 
-  const weeklyData: WeeklyResult[] = activeWeeks.map((hires, index) => {
-    const rawSourcersNeeded = (hires * config.candidatesPerHireBenchmark) / config.sourcerCapacityPerWeek;
-    const rawTPsNeeded = hires / config.tpCapacityPerWeek;
+  const weeklyData: WeeklyResult[] = [];
 
-    const sourcersNeeded = Math.ceil(rawSourcersNeeded);
-    const tpsNeeded = Math.ceil(rawTPsNeeded);
+  // Build the full timeline: Ramp Up Weeks + Hiring Weeks
+  for (let i = 0; i < totalWeeks; i++) {
+    const isRampUp = i < rampUpWeeks;
+    const demand = isRampUp ? 0 : hiringDemand[i - rampUpWeeks];
+    
+    // During ramp-up, resources are needed based on the upcoming hiring volume
+    const resourceBasis = isRampUp ? rampResourceDemand : demand;
 
-    let gap = 0;
-    if (hires > 0) {
-      gap = Math.max(0, (hires - actualCapacity) / hires);
-    }
+    const rawSourcersNeeded = (resourceBasis * config.candidatesPerHireBenchmark) / config.sourcerCapacityPerWeek;
+    const rawTPsNeeded = resourceBasis / config.tpCapacityPerWeek;
 
-    return {
-      week: index + 1,
-      demand: hires,
-      sourcersNeeded,
-      tpsNeeded,
+    weeklyData.push({
+      week: i + 1,
+      isRampUp,
+      demand,
+      sourcersNeeded: Math.ceil(rawSourcersNeeded),
+      tpsNeeded: Math.ceil(rawTPsNeeded),
       capacity: actualCapacity,
-      gap: gap,
-    };
-  });
+      gap: demand > 0 ? Math.max(0, (demand - actualCapacity) / demand) : 0,
+    });
+  }
 
-  // Calculate totalDemand from the active weeks directly
-  const totalDemand = activeWeeks.reduce((a, b) => a + b, 0);
-  const peakWeeklyDemand = Math.max(...activeWeeks, 0);
+  const totalDemand = hiringDemand.reduce((a, b) => a + b, 0);
+  const peakWeeklyDemand = Math.max(...hiringDemand, 0);
   const maxTPsNeeded = Math.max(...weeklyData.map(d => d.tpsNeeded), 0);
   const maxSourcersNeeded = Math.max(...weeklyData.map(d => d.sourcersNeeded), 0);
   
-  const totalCapacityOverPeriod = weeklyData.reduce((sum, w) => sum + w.capacity, 0);
   const capacityGapPercent = totalDemand > 0 
-    ? Math.max(0, ((totalDemand - totalCapacityOverPeriod) / totalDemand) * 100)
+    ? Math.max(0, ((totalDemand - (actualCapacity * hiringDuration)) / totalDemand) * 100)
     : 0;
 
   return {
@@ -68,75 +72,54 @@ export const calculateScenarioMetrics = (
 
 export const aggregateResults = (results: SimulationResult[], scenarios: Scenario[], config: GlobalConfig): SimulationResult => {
   if (results.length === 0) {
-      return {
-          totalDemand: 0,
-          peakWeeklyDemand: 0,
-          maxTPsNeeded: 0,
-          maxSourcersNeeded: 0,
-          capacityGapPercent: 0,
-          weeklyData: [],
-          maxCapacity: 0,
-          limitingFactor: 'Balanced',
-          currentTPs: 0,
-          currentSourcers: 0
-      }
+    return {
+      totalDemand: 0, peakWeeklyDemand: 0, maxTPsNeeded: 0, maxSourcersNeeded: 0, 
+      capacityGapPercent: 0, weeklyData: [], maxCapacity: 0, limitingFactor: 'Balanced', 
+      currentTPs: 0, currentSourcers: 0 
+    };
   }
 
-  // Calculate Global Shared Capacity from all scenarios
+  const { hiringDuration, rampUpWeeks } = config;
+  const totalWeeks = hiringDuration + rampUpWeeks;
+
   const totalCurrentTPs = scenarios.reduce((sum, s) => sum + (s.currentTalentPartners || 0), 0);
-  const totalCurrentSourcers = config.totalSourcers; 
-  
   const totalTpCapacity = totalCurrentTPs * config.tpCapacityPerWeek;
-  const totalSourcerCapacity = (totalCurrentSourcers * config.sourcerCapacityPerWeek) / config.candidatesPerHireBenchmark;
-  
+  const totalSourcerCapacity = (config.totalSourcers * config.sourcerCapacityPerWeek) / config.candidatesPerHireBenchmark;
   const sharedWeeklyCapacity = Math.min(totalTpCapacity, totalSourcerCapacity);
-  const limitingFactor = totalTpCapacity < totalSourcerCapacity ? 'Talent Partners' : (totalSourcerCapacity < totalTpCapacity ? 'Sourcers' : 'Balanced');
 
-  // Use config.weeksToSimulate to ensure we loop through the correct timeframe
-  const numWeeks = config.weeksToSimulate;
   const weeklyData: WeeklyResult[] = [];
+  
+  // Find aggregate demand for the first hiring week to calculate ramp-up resources
+  let aggregateRampDemand = 0;
+  scenarios.forEach(s => {
+    aggregateRampDemand += (s.demand[0] || 0);
+  });
 
-  for (let i = 0; i < numWeeks; i++) {
-    // Robust Summing: Iterate through all results and safely add demand for week i
-    const weekDemand = results.reduce((sum, r) => {
-        // Use optional chaining and default to 0 to handle potential undefined if arrays are mismatched
-        const val = r.weeklyData[i]?.demand;
-        return sum + (typeof val === 'number' ? val : 0);
-    }, 0);
-    
-    // RECALCULATE needed resources based on TOTAL demand (Shared Pool Logic)
-    const rawSourcersNeeded = (weekDemand * config.candidatesPerHireBenchmark) / config.sourcerCapacityPerWeek;
-    const rawTPsNeeded = weekDemand / config.tpCapacityPerWeek;
-    
-    const weekSourcers = Math.ceil(rawSourcersNeeded);
-    const weekTPs = Math.ceil(rawTPsNeeded);
-    
-    const weekCapacity = sharedWeeklyCapacity;
+  for (let i = 0; i < totalWeeks; i++) {
+    const isRampUp = i < rampUpWeeks;
+    const weekDemand = results.reduce((sum, r) => sum + (r.weeklyData[i]?.demand || 0), 0);
+    const resourceBasis = isRampUp ? aggregateRampDemand : weekDemand;
 
-    let gap = 0;
-    if (weekDemand > 0) {
-        gap = Math.max(0, (weekDemand - weekCapacity) / weekDemand);
-    }
+    const rawSourcersNeeded = (resourceBasis * config.candidatesPerHireBenchmark) / config.sourcerCapacityPerWeek;
+    const rawTPsNeeded = resourceBasis / config.tpCapacityPerWeek;
 
     weeklyData.push({
       week: i + 1,
+      isRampUp,
       demand: weekDemand,
-      sourcersNeeded: weekSourcers,
-      tpsNeeded: weekTPs,
-      capacity: weekCapacity,
-      gap: gap 
+      sourcersNeeded: Math.ceil(rawSourcersNeeded),
+      tpsNeeded: Math.ceil(rawTPsNeeded),
+      capacity: sharedWeeklyCapacity,
+      gap: weekDemand > 0 ? Math.max(0, (weekDemand - sharedWeeklyCapacity) / weekDemand) : 0
     });
   }
 
-  // Calculate Aggregates from the newly constructed weeklyData to ensure consistency
   const totalDemand = weeklyData.reduce((sum, w) => sum + w.demand, 0);
   const peakWeeklyDemand = Math.max(...weeklyData.map(d => d.demand), 0);
   const maxTPsNeeded = Math.max(...weeklyData.map(d => d.tpsNeeded), 0);
   const maxSourcersNeeded = Math.max(...weeklyData.map(d => d.sourcersNeeded), 0);
-  
-  const totalCapacityOverPeriod = weeklyData.reduce((sum, w) => sum + w.capacity, 0);
   const capacityGapPercent = totalDemand > 0 
-    ? Math.max(0, ((totalDemand - totalCapacityOverPeriod) / totalDemand) * 100)
+    ? Math.max(0, ((totalDemand - (sharedWeeklyCapacity * hiringDuration)) / totalDemand) * 100)
     : 0;
 
   return {
@@ -147,31 +130,26 @@ export const aggregateResults = (results: SimulationResult[], scenarios: Scenari
     capacityGapPercent,
     weeklyData,
     maxCapacity: sharedWeeklyCapacity,
-    limitingFactor,
+    limitingFactor: totalTpCapacity < totalSourcerCapacity ? 'Talent Partners' : 'Sourcers',
     currentTPs: totalCurrentTPs,
-    currentSourcers: totalCurrentSourcers
+    currentSourcers: config.totalSourcers
   };
 };
 
-export const generateCurve = (type: 'flat' | 'linear' | 'seasonal' | 'front-loaded', weeks: number, totalHires: number): number[] => {
-  let curve = new Array(weeks).fill(0);
-  
+export const generateCurve = (type: 'flat' | 'linear', weeks: number, totalHires: number): number[] => {
+  if (weeks <= 0) return [];
   if (type === 'flat') {
-    const perWeek = totalHires / weeks; 
-    return curve.map(() => perWeek);
+    return new Array(weeks).fill(totalHires / weeks);
   }
-  
-  if (type === 'linear') {
-    const slope = (2 * totalHires) / (weeks * weeks);
-    let currentSum = 0;
-    curve = curve.map((_, i) => {
-        const val = slope * (i + 1);
-        currentSum += val;
-        return val;
-    });
-    const factor = totalHires / currentSum;
-    return curve.map(v => v * factor);
-  } 
-  
-  return curve.map(() => totalHires / weeks);
+  // Simplified linear curve
+  const curve = new Array(weeks).fill(0);
+  const slope = (2 * totalHires) / (weeks * (weeks + 1));
+  let sum = 0;
+  const vals = curve.map((_, i) => {
+    const v = slope * (i + 1);
+    sum += v;
+    return v;
+  });
+  const factor = totalHires / sum;
+  return vals.map(v => v * factor);
 };

@@ -36,12 +36,11 @@ const App: React.FC = () => {
     const newScenario: Scenario = {
       id: newId,
       name: `Pool ${newId}`,
-      demand: Array(config.weeksToSimulate).fill(0), // Default to current weeks config
+      demand: Array(config.hiringDuration).fill(1),
       color,
       currentTalentPartners: 0,
     };
     setScenarios([...scenarios, newScenario]);
-    // Do not auto-select the new scenario so the user stays on "All Pools" view if currently selected
   };
 
   const handleDeleteScenario = (id: string) => {
@@ -55,42 +54,29 @@ const App: React.FC = () => {
       const element = document.getElementById('simulation-content');
       if (!element) return;
 
-      // Ensure fonts are loaded before capturing
       await document.fonts.ready;
-
-      // Get all original inputs to read their computed styles
       const originalInputs = element.querySelectorAll('input');
 
       const canvas = await html2canvas(element, {
-        scale: 2, // Retain high quality
+        scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#f8fafc', // Match bg-slate-50
+        backgroundColor: '#f8fafc',
         onclone: (clonedDoc) => {
-             // 1. Force system fonts on the container
              const clonedElement = clonedDoc.getElementById('simulation-content');
              if (clonedElement) {
                  clonedElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
              }
              
-             // 2. Replace inputs with styled spans
-             // This is the most reliable way to ensure input values render in html2canvas
              const clonedInputs = clonedDoc.querySelectorAll('input');
-             
              clonedInputs.forEach((clonedInput, index) => {
                  const originalInput = originalInputs[index];
-                 
-                 // Skip if types don't match or hidden/checkbox (focus on text/number)
                  if (clonedInput.type !== 'text' && clonedInput.type !== 'number') return;
                  if (!originalInput) return;
 
                  const style = window.getComputedStyle(originalInput);
                  const span = clonedDoc.createElement('span');
-                 
-                 // Set text content to current value
                  span.textContent = originalInput.value;
-                 
-                 // Copy critical styles
                  span.style.fontFamily = 'Arial, Helvetica, sans-serif';
                  span.style.fontSize = style.fontSize;
                  span.style.fontWeight = style.fontWeight;
@@ -107,19 +93,16 @@ const App: React.FC = () => {
                  span.style.alignItems = 'center';
                  span.style.boxSizing = 'border-box';
                  
-                 // Handle specific alignment adjustments if needed
                  if (style.textAlign === 'center') {
                      span.style.justifyContent = 'center';
                  }
                  
-                 // Replace the input with the span in the cloned DOM
                  if (clonedInput.parentNode) {
                      clonedInput.parentNode.insertBefore(span, clonedInput);
                      clonedInput.style.display = 'none';
                  }
              });
              
-             // 3. Fix Recharts SVG text elements
              const svgTexts = clonedDoc.querySelectorAll('text');
              svgTexts.forEach((text: SVGTextElement) => {
                  text.style.fontFamily = 'Arial, Helvetica, sans-serif';
@@ -128,7 +111,6 @@ const App: React.FC = () => {
       });
 
       const imgData = canvas.toDataURL('image/png');
-      
       const pdf = new jsPDF({
         orientation: canvas.width > canvas.height ? 'l' : 'p',
         unit: 'px',
@@ -144,7 +126,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Calculations
   const calculatedResults = useMemo(() => {
     const individualResults = scenarios.map(s => ({
        scenarioId: s.id,
@@ -162,12 +143,11 @@ const App: React.FC = () => {
 
   const displayResult = calculatedResults.activeScenarioResult || calculatedResults.aggregateResult;
   const displayTitle = selectedScenarioId 
-    ? scenarios.find(s => s.id === selectedScenarioId)?.name || 'Scenario'
+    ? scenarios.find(s => s.id === selectedScenarioId)?.name || 'Pool'
     : 'All Talent Pools';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Header */}
       <header className="bg-brand-primary border-b border-brand-dark sticky top-0 z-20 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -177,14 +157,10 @@ const App: React.FC = () => {
              <h1 className="text-xl font-heading font-bold text-white tracking-wide">IRT Simulator</h1>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-sm text-brand-light font-medium hidden md:block">
-              Capacity Planning Simulator
-            </div>
             <button
               onClick={handleDownloadPDF}
               disabled={isDownloading}
               className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
-              title="Download Report as PDF"
             >
               {isDownloading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -197,18 +173,13 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content with ID for PDF Capture */}
       <main 
         id="simulation-content"
         className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8"
       >
-        
-        {/* Global Config */}
         <SettingsPanel config={config} onChange={setConfig} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Left Sidebar: Scenarios */}
           <div className="lg:col-span-3 space-y-4">
              <div className="flex items-center justify-between mb-2">
                <h3 className="font-heading font-semibold text-slate-700">Talent Pools</h3>
@@ -243,16 +214,13 @@ const App: React.FC = () => {
                    onDelete={handleDeleteScenario}
                    isActive={selectedScenarioId === scenario.id}
                    onSelect={() => setSelectedScenarioId(scenario.id)}
-                   weeksToSimulate={config.weeksToSimulate}
+                   config={config}
                  />
                ))}
              </div>
           </div>
 
-          {/* Main Content: Results */}
           <div className="lg:col-span-9 space-y-6">
-            
-            {/* Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                <MetricCard 
                  label="Total Demand" 
@@ -296,16 +264,13 @@ const App: React.FC = () => {
                />
             </div>
 
-            {/* Charts */}
             <ChartSection 
               results={displayResult} 
               config={config} 
               title={displayTitle}
             />
 
-            {/* Detailed Table */}
             <DataTable results={displayResult} />
-            
           </div>
         </div>
       </main>

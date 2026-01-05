@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Scenario } from '../types';
+import { Scenario, GlobalConfig } from '../types';
 import { Trash2, Settings2 } from 'lucide-react';
 import { generateCurve } from '../utils/calculations';
 
@@ -9,7 +9,7 @@ interface ScenarioInputProps {
   onDelete: (id: string) => void;
   isActive: boolean;
   onSelect: () => void;
-  weeksToSimulate: number;
+  config: GlobalConfig;
 }
 
 const ScenarioInput: React.FC<ScenarioInputProps> = ({
@@ -18,20 +18,18 @@ const ScenarioInput: React.FC<ScenarioInputProps> = ({
   onDelete,
   isActive,
   onSelect,
-  weeksToSimulate,
+  config
 }) => {
   const [totalTarget, setTotalTarget] = useState(scenario.demand.reduce((a, b) => a + b, 0));
   const [isEditing, setIsEditing] = useState(false);
 
   const handleCurveApply = () => {
-    // Use the selected weeksToSimulate to distribute the total target.
-    // e.g. 120 hires over 12 weeks = 10 hires/week.
-    const newDemand = generateCurve('flat', weeksToSimulate, totalTarget);
-    onUpdate({ ...scenario, demand: newDemand });
+    // Generate the curve based on the Hiring Duration defined in config
+    const hiringDemand = generateCurve('flat', config.hiringDuration, totalTarget);
+    onUpdate({ ...scenario, demand: hiringDemand });
     setIsEditing(false);
   };
 
-  // Recalculate display sum based on current demand array
   const currentTotal = scenario.demand.reduce((a, b) => a + b, 0);
 
   return (
@@ -46,7 +44,7 @@ const ScenarioInput: React.FC<ScenarioInputProps> = ({
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3">
           <div 
-            className="w-4 h-4 rounded-full shadow-sm" 
+            className="w-3 h-3 rounded-full shadow-sm" 
             style={{ backgroundColor: scenario.color }}
           ></div>
           <input
@@ -59,66 +57,65 @@ const ScenarioInput: React.FC<ScenarioInputProps> = ({
         </div>
         <button 
           onClick={(e) => { e.stopPropagation(); onDelete(scenario.id); }}
-          className="text-slate-400 hover:text-red-500 transition-colors"
-          title="Delete Pool"
+          className="text-slate-300 hover:text-red-500 transition-colors"
         >
           <Trash2 size={16} />
         </button>
       </div>
 
       <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
-        {/* Current Resources Inputs */}
-        <div className="grid grid-cols-1 gap-3 text-sm">
+        <div className="grid grid-cols-1 gap-3">
            <div>
-              <label className="block text-xs text-slate-500 mb-1">Current TPs</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Current TPs</label>
               <input
                 type="number"
                 min="0"
                 value={scenario.currentTalentPartners}
                 onChange={(e) => onUpdate({...scenario, currentTalentPartners: parseInt(e.target.value) || 0})}
-                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-700 text-xs focus:ring-1 focus:ring-brand-primary outline-none"
+                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs focus:ring-2 focus:ring-brand-primary outline-none font-bold"
               />
            </div>
         </div>
 
-        {/* Demand Generation */}
         <div className="pt-3 border-t border-slate-100">
            {!isEditing ? (
              <div className="flex items-center justify-between">
                 <div>
-                   <span className="text-2xl font-bold text-slate-800 font-heading">{currentTotal.toFixed(0)}</span>
-                   <span className="text-xs text-slate-500 ml-1">hires</span>
+                   <span className="text-xl font-bold text-slate-800 font-heading">{currentTotal.toFixed(0)}</span>
+                   <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Hires</span>
                 </div>
                 <button 
                    onClick={() => setIsEditing(true)}
                    className="p-1.5 text-brand-primary hover:bg-brand-light rounded-md transition-colors"
-                   title="Edit Distribution"
                 >
                    <Settings2 size={16} />
                 </button>
              </div>
            ) : (
-             <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+             <div className="animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="mb-3">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Total Target ({weeksToSimulate} weeks)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Hires over {config.hiringDuration} weeks
+                  </label>
                   <input
                     type="number"
                     value={totalTarget}
                     onChange={(e) => setTotalTarget(parseInt(e.target.value) || 0)}
-                    className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-brand-light outline-none"
+                    className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-primary outline-none font-bold"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1 italic">Will begin after week {config.rampUpWeeks}</p>
                 </div>
 
                 <div className="flex gap-2">
                   <button
                     onClick={() => setIsEditing(false)}
-                    className="flex-1 py-1 text-xs text-slate-500 hover:bg-slate-100 rounded"
+                    className="flex-1 py-1 text-[10px] font-bold uppercase text-slate-400 hover:bg-slate-100 rounded"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleCurveApply}
-                    className="flex-1 py-1 text-xs bg-brand-primary text-white rounded hover:bg-brand-dark font-medium"
+                    className="flex-1 py-1 text-[10px] font-bold uppercase bg-brand-primary text-white rounded hover:bg-brand-dark"
                   >
                     Apply
                   </button>
