@@ -7,13 +7,13 @@ export const calculateScenarioMetrics = (
   const { hiringDuration, rampUpWeeks } = config;
   const totalWeeks = hiringDuration + rampUpWeeks;
 
-  // Prepare the hiring demand array (ensuring it matches hiringDuration)
-  let hiringDemand = [...scenario.demand];
-  if (hiringDemand.length < hiringDuration) {
-    hiringDemand = [...hiringDemand, ...Array(hiringDuration - hiringDemand.length).fill(0)];
-  } else {
-    hiringDemand = hiringDemand.slice(0, hiringDuration);
-  }
+  // Preserve the intended total volume: sum the original demand array
+  const totalHiresTarget = scenario.demand.reduce((a, b) => a + b, 0);
+  
+  // Redistribute that volume across the CURRENT hiring duration
+  // This ensures that if duration shrinks, weekly intensity increases to keep demand constant.
+  const hiresPerWeek = totalHiresTarget > 0 ? totalHiresTarget / hiringDuration : 0;
+  const hiringDemand = new Array(hiringDuration).fill(hiresPerWeek);
 
   // Demand for resource calculation during ramp-up (look ahead to the first hiring week)
   const rampResourceDemand = hiringDemand[0] || 0;
@@ -87,18 +87,16 @@ export const aggregateResults = (results: SimulationResult[], scenarios: Scenari
   const totalSourcerCapacity = (config.totalSourcers * config.sourcerCapacityPerWeek) / config.candidatesPerHireBenchmark;
   const sharedWeeklyCapacity = Math.min(totalTpCapacity, totalSourcerCapacity);
 
+  // Aggregate total demand target from all scenarios
+  const totalAggregateHires = scenarios.reduce((sum, s) => sum + s.demand.reduce((a, b) => a + b, 0), 0);
+  const aggHiresPerWeek = totalAggregateHires / hiringDuration;
+
   const weeklyData: WeeklyResult[] = [];
   
-  // Find aggregate demand for the first hiring week to calculate ramp-up resources
-  let aggregateRampDemand = 0;
-  scenarios.forEach(s => {
-    aggregateRampDemand += (s.demand[0] || 0);
-  });
-
   for (let i = 0; i < totalWeeks; i++) {
     const isRampUp = i < rampUpWeeks;
-    const weekDemand = results.reduce((sum, r) => sum + (r.weeklyData[i]?.demand || 0), 0);
-    const resourceBasis = isRampUp ? aggregateRampDemand : weekDemand;
+    const weekDemand = isRampUp ? 0 : aggHiresPerWeek;
+    const resourceBasis = aggHiresPerWeek; // Constant basis for aggregate
 
     const rawSourcersNeeded = (resourceBasis * config.candidatesPerHireBenchmark) / config.sourcerCapacityPerWeek;
     const rawTPsNeeded = resourceBasis / config.tpCapacityPerWeek;

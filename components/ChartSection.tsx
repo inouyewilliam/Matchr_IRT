@@ -47,7 +47,8 @@ const ChartSection: React.FC<ChartSectionProps> = ({ results, config, title }) =
           <XAxis 
             dataKey="name" 
             tick={{fontSize: 10, fill: '#64748b'}} 
-            interval={config.weeksToSimulate <= 15 ? 0 : 3} 
+            // Fix: Use the length of results.weeklyData as the total simulation duration since weeksToSimulate is not in GlobalConfig
+            interval={results.weeklyData.length <= 15 ? 0 : 3} 
             tickLine={false}
             axisLine={{stroke: '#cbd5e1'}}
           />

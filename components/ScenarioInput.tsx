@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Scenario, GlobalConfig } from '../types';
 import { Trash2, Settings2 } from 'lucide-react';
 import { generateCurve } from '../utils/calculations';
@@ -22,6 +22,15 @@ const ScenarioInput: React.FC<ScenarioInputProps> = ({
 }) => {
   const [totalTarget, setTotalTarget] = useState(scenario.demand.reduce((a, b) => a + b, 0));
   const [isEditing, setIsEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea height based on content
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [scenario.name]);
 
   const handleCurveApply = () => {
     // Generate the curve based on the Hiring Duration defined in config
@@ -41,23 +50,25 @@ const ScenarioInput: React.FC<ScenarioInputProps> = ({
       }`}
       onClick={onSelect}
     >
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-3">
+      <div className="flex justify-between items-start mb-3 gap-2">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
           <div 
-            className="w-3 h-3 rounded-full shadow-sm" 
+            className="w-3 h-3 rounded-full shadow-sm mt-1.5 flex-shrink-0" 
             style={{ backgroundColor: scenario.color }}
           ></div>
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
+            rows={1}
             value={scenario.name}
             onChange={(e) => onUpdate({ ...scenario, name: e.target.value })}
-            className="font-bold font-heading text-slate-800 bg-transparent border-b border-transparent focus:border-brand-primary focus:outline-none w-32"
+            className="font-bold font-heading text-slate-800 bg-transparent border-b border-transparent focus:border-brand-primary focus:outline-none w-full resize-none overflow-hidden leading-tight py-0.5"
             onClick={(e) => e.stopPropagation()}
+            placeholder="Pool Name"
           />
         </div>
         <button 
           onClick={(e) => { e.stopPropagation(); onDelete(scenario.id); }}
-          className="text-slate-300 hover:text-red-500 transition-colors"
+          className="text-slate-300 hover:text-red-500 transition-colors p-1 flex-shrink-0"
         >
           <Trash2 size={16} />
         </button>
@@ -66,12 +77,13 @@ const ScenarioInput: React.FC<ScenarioInputProps> = ({
       <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="grid grid-cols-1 gap-3">
            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Current TPs</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Current TPs (can be fraction)</label>
               <input
                 type="number"
                 min="0"
+                step="0.01"
                 value={scenario.currentTalentPartners}
-                onChange={(e) => onUpdate({...scenario, currentTalentPartners: parseInt(e.target.value) || 0})}
+                onChange={(e) => onUpdate({...scenario, currentTalentPartners: parseFloat(e.target.value) || 0})}
                 className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs focus:ring-2 focus:ring-brand-primary outline-none font-bold"
               />
            </div>
