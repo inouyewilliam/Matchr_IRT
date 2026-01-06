@@ -21,6 +21,7 @@ export interface WeeklyResult {
   demand: number;
   sourcersNeeded: number;
   tpsNeeded: number;
+  coordinatorsNeeded: number;
   capacity: number;
   gap: number;
 }
@@ -30,6 +31,7 @@ export interface SimulationResult {
   peakWeeklyDemand: number;
   maxTPsNeeded: number;
   maxSourcersNeeded: number;
+  maxCoordinatorsNeeded: number;
   capacityGapPercent: number;
   weeklyData: WeeklyResult[];
   currentTPs: number;

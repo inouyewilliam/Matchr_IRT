@@ -25,6 +25,7 @@ const DataTable: React.FC<DataTableProps> = ({ results }) => {
               <th className="px-6 py-4 font-bold text-brand-primary">Demand (Hires)</th>
               <th className="px-6 py-4 font-bold text-brand-dark">TPs Needed</th>
               <th className="px-6 py-4 font-bold text-brand-accent">Sourcers Needed</th>
+              <th className="px-6 py-4 font-bold text-blue-600">Coordinators</th>
               <th className="px-6 py-4 font-bold">Capacity Gap</th>
             </tr>
           </thead>
@@ -38,6 +39,7 @@ const DataTable: React.FC<DataTableProps> = ({ results }) => {
                 <td className="px-6 py-3 text-brand-primary font-bold">{row.demand.toFixed(1)}</td>
                 <td className="px-6 py-3 text-brand-dark font-bold">{row.tpsNeeded}</td>
                 <td className="px-6 py-3 text-brand-accent font-bold">{row.sourcersNeeded}</td>
+                <td className="px-6 py-3 text-blue-600 font-bold">{row.coordinatorsNeeded}</td>
                 <td className="px-6 py-3">
                   {!row.isRampUp && row.gap > 0 ? (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 uppercase">

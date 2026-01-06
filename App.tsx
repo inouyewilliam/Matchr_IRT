@@ -15,7 +15,8 @@ import {
   AlertTriangle, 
   LayoutDashboard,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  CalendarCheck
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -169,7 +170,7 @@ const App: React.FC = () => {
 
         <SettingsPanel config={config} onChange={setConfig} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <MetricCard
             label="Total Hiring Demand"
             value={displayResult.totalDemand.toFixed(0)}
@@ -193,6 +194,14 @@ const App: React.FC = () => {
             icon={Search}
             color="text-brand-accent"
             bgColor="bg-yellow-50"
+          />
+          <MetricCard
+            label="Peak Coordinators"
+            value={displayResult.maxCoordinatorsNeeded}
+            subValue={`1 per 4 TPs`}
+            icon={CalendarCheck}
+            color="text-blue-600"
+            bgColor="bg-blue-50"
           />
           <MetricCard
             label="Capacity Gap"
