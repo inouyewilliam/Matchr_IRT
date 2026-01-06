@@ -7,8 +7,6 @@ import SettingsPanel from './components/SettingsPanel';
 import MetricCard from './components/MetricCard';
 import ChartSection from './components/ChartSection';
 import DataTable from './components/DataTable';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import { 
   PlusCircle, 
   Users, 
@@ -16,19 +14,14 @@ import {
   Briefcase, 
   AlertTriangle, 
   LayoutDashboard,
-  Download,
   Loader2,
-  DatabaseZap,
-  RefreshCw,
-  Info,
-  ExternalLink
+  RefreshCw
 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [scenarios, setScenarios] = useState<Scenario[]>(INITIAL_SCENARIOS);
   const [config, setConfig] = useState<GlobalConfig>(DEFAULT_CONFIG);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -116,71 +109,6 @@ const App: React.FC = () => {
     handleSyncData();
   }, [handleSyncData]);
 
-  const handleDownloadPDF = async () => {
-    setIsDownloading(true);
-    try {
-      const element = document.getElementById('simulation-content');
-      if (!element) return;
-      await document.fonts.ready;
-      const originalInputs = element.querySelectorAll('input');
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#f8fafc',
-        onclone: (clonedDoc) => {
-             const clonedElement = clonedDoc.getElementById('simulation-content');
-             if (clonedElement) clonedElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
-             const clonedInputs = clonedDoc.querySelectorAll('input');
-             clonedInputs.forEach((clonedInput, index) => {
-                 const originalInput = originalInputs[index];
-                 if (clonedInput.type !== 'text' && clonedInput.type !== 'number') return;
-                 if (!originalInput) return;
-                 const style = window.getComputedStyle(originalInput);
-                 const span = clonedDoc.createElement('span');
-                 span.textContent = (originalInput as HTMLInputElement).value;
-                 span.style.fontFamily = 'Arial, Helvetica, sans-serif';
-                 span.style.fontSize = style.fontSize;
-                 span.style.fontWeight = style.fontWeight;
-                 span.style.color = style.color;
-                 span.style.backgroundColor = style.backgroundColor;
-                 span.style.border = style.border;
-                 span.style.borderRadius = style.borderRadius;
-                 span.style.padding = style.padding;
-                 span.style.margin = style.margin;
-                 span.style.width = style.width;
-                 span.style.height = style.height;
-                 span.style.textAlign = style.textAlign;
-                 span.style.display = 'inline-flex';
-                 span.style.alignItems = 'center';
-                 span.style.boxSizing = 'border-box';
-                 if (style.textAlign === 'center') span.style.justifyContent = 'center';
-                 if (clonedInput.parentNode) {
-                     clonedInput.parentNode.insertBefore(span, clonedInput);
-                     (clonedInput as HTMLElement).style.display = 'none';
-                 }
-             });
-             const svgTexts = clonedDoc.querySelectorAll('text');
-             svgTexts.forEach((text: SVGTextElement) => {
-                 text.style.fontFamily = 'Arial, Helvetica, sans-serif';
-             });
-        }
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: canvas.width > canvas.height ? 'l' : 'p',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(`irt-capacity-report-${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (error) {
-      console.error('PDF export failed:', error);
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   const calculatedResults = useMemo(() => {
     const individualResults = scenarios.map(s => ({
        scenarioId: s.id,
@@ -216,15 +144,6 @@ const App: React.FC = () => {
             >
               {isSyncing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
               <span>{isSyncing ? 'Syncing...' : 'Sync from DB'}</span>
-            </button>
-
-            <button
-              onClick={handleDownloadPDF}
-              disabled={isDownloading}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-bold transition-all border border-white/20 active:scale-95 disabled:opacity-50"
-            >
-              {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-              <span>Export PDF</span>
             </button>
           </div>
         </div>
