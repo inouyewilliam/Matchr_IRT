@@ -4,9 +4,9 @@ export const DEFAULT_CONFIG: GlobalConfig = {
   hiringDuration: 16,
   rampUpWeeks: 4,
   tpCapacityPerWeek: 1,
-  sourcerCapacityPerWeek: 10,
-  candidatesPerHireBenchmark: 10,
-  totalSourcers: 2,
+  poolsPerSourcer: 5, // Baseline: 5 concurrent pools per sourcer
+  totalSourcers: 1,
+  isManualSourcers: false,
 };
 
 export const INITIAL_SCENARIOS: Scenario[] = [

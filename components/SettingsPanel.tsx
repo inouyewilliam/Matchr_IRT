@@ -1,6 +1,6 @@
 import React from 'react';
 import { GlobalConfig } from '../types';
-import { Sliders, Search, Clock, Zap } from 'lucide-react';
+import { Sliders, Search, Clock, Zap, Sparkles, Layers } from 'lucide-react';
 
 interface SettingsPanelProps {
   config: GlobalConfig;
@@ -46,26 +46,47 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Sourcer Headcount Card */}
         <div className="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100">
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2">
-            <Search size={14} className="text-brand-accent" /> Total Sourcers
-          </label>
-           <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+              <Search size={14} className="text-brand-accent" /> Total Sourcers
+            </label>
+            {!config.isManualSourcers && (
+              <span className="flex items-center gap-0.5 text-[9px] font-black text-brand-accent bg-white/80 px-1.5 py-0.5 rounded-full uppercase border border-yellow-200">
+                <Sparkles size={8} /> Auto
+              </span>
+            )}
+          </div>
+          <div className="relative">
+            {config.isManualSourcers && (
+              <button 
+                onClick={() => onChange({...config, isManualSourcers: false})}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-brand-accent hover:underline uppercase z-10"
+              >
+                Reset
+              </button>
+            )}
             <input 
               type="number" 
               min="0" 
               max="100" 
               value={config.totalSourcers}
-              onChange={(e) => onChange({...config, totalSourcers: Math.max(0, parseInt(e.target.value) || 0)})}
-              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 text-sm focus:ring-2 focus:ring-brand-accent outline-none font-bold"
+              onChange={(e) => onChange({...config, totalSourcers: Math.max(0, parseInt(e.target.value) || 0), isManualSourcers: true})}
+              className={`w-full py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-accent outline-none font-bold transition-colors ${
+                config.isManualSourcers ? 'bg-white border-slate-300 text-slate-700 pl-11 pr-2' : 'bg-white/50 border-slate-200 text-brand-accent/80 px-2'
+              }`}
             />
           </div>
-          <p className="text-[10px] text-slate-400 mt-2 italic font-medium">Shared recruitment resource pool</p>
+          <p className="text-[10px] text-slate-400 mt-2 italic font-medium leading-tight">Shared resource pool. Auto-calculated based on Sourcer Load ratio.</p>
         </div>
 
+        {/* TP Capacity Slider */}
         <div className="pt-2">
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">TP Capacity</label>
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+            <Zap size={14} className="text-brand-primary" /> TP Closure Rate
+          </label>
           <div className="flex items-center gap-3">
             <input 
               type="range" 
@@ -78,41 +99,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
             />
             <span className="min-w-[40px] text-right font-mono text-sm font-bold text-brand-primary">{config.tpCapacityPerWeek}</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Hires / Week</p>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tight">Hires per TP per Week</p>
         </div>
 
+        {/* New Sourcer Load Slider */}
         <div className="pt-2">
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Sourcer Efficiency</label>
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+            <Layers size={14} className="text-brand-accent" /> Sourcer Load
+          </label>
            <div className="flex items-center gap-3">
             <input 
               type="range" 
               min="1" 
-              max="50" 
+              max="15" 
               step="1"
-              value={config.sourcerCapacityPerWeek}
-              onChange={(e) => onChange({...config, sourcerCapacityPerWeek: parseInt(e.target.value)})}
+              value={config.poolsPerSourcer}
+              onChange={(e) => onChange({...config, poolsPerSourcer: parseInt(e.target.value)})}
               className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-accent"
             />
-            <span className="min-w-[40px] text-right font-mono text-sm font-bold text-brand-accent">{config.sourcerCapacityPerWeek}</span>
+            <span className="min-w-[40px] text-right font-mono text-sm font-bold text-brand-accent">{config.poolsPerSourcer}</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Candidates / Week</p>
-        </div>
-
-        <div className="pt-2">
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Benchmark</label>
-          <div className="flex items-center gap-3">
-            <input 
-              type="range" 
-              min="1" 
-              max="50" 
-              step="1"
-              value={config.candidatesPerHireBenchmark}
-              onChange={(e) => onChange({...config, candidatesPerHireBenchmark: parseInt(e.target.value)})}
-              className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-400"
-            />
-             <span className="min-w-[40px] text-right font-mono text-sm font-bold text-slate-600">{config.candidatesPerHireBenchmark}</span>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Candidates / Hire</p>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tight">Concurrent Pools per Sourcer</p>
         </div>
       </div>
     </div>

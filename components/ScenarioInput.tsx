@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Scenario, GlobalConfig } from '../types';
-import { Trash2, Settings2 } from 'lucide-react';
+import { Trash2, Settings2, Sparkles } from 'lucide-react';
 import { generateCurve } from '../utils/calculations';
 
 interface ScenarioInputProps {
@@ -77,15 +77,39 @@ const ScenarioInput: React.FC<ScenarioInputProps> = ({
       <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="grid grid-cols-1 gap-3">
            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Current TPs (can be fraction)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={scenario.currentTalentPartners}
-                onChange={(e) => onUpdate({...scenario, currentTalentPartners: parseFloat(e.target.value) || 0})}
-                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs focus:ring-2 focus:ring-brand-primary outline-none font-bold"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                  Allocation (TPs)
+                </label>
+                {!scenario.isManualTP && (
+                  <span className="flex items-center gap-0.5 text-[9px] font-black text-brand-primary bg-brand-light/40 px-1.5 py-0.5 rounded-full uppercase">
+                    <Sparkles size={8} /> Auto
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                {scenario.isManualTP && (
+                  <button 
+                    onClick={() => onUpdate({...scenario, isManualTP: false})}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-brand-primary hover:underline uppercase z-10"
+                  >
+                    Reset
+                  </button>
+                )}
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={scenario.currentTalentPartners.toFixed(2)}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    onUpdate({...scenario, currentTalentPartners: val, isManualTP: true});
+                  }}
+                  className={`w-full py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-brand-primary outline-none font-bold transition-colors ${
+                    scenario.isManualTP ? 'bg-white border-slate-300 text-slate-700 pl-11 pr-2' : 'bg-slate-50 border-slate-200 text-brand-primary/80 px-2'
+                  }`}
+                />
+              </div>
            </div>
         </div>
 

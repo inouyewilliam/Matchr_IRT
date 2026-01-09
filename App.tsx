@@ -16,7 +16,8 @@ import {
   LayoutDashboard,
   Loader2,
   RefreshCw,
-  CalendarCheck
+  CalendarCheck,
+  Database
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -39,6 +40,7 @@ const App: React.FC = () => {
       demand: Array(config.hiringDuration).fill(1),
       color,
       currentTalentPartners: 0,
+      isManualTP: false,
     };
     setScenarios([...scenarios, newScenario]);
   };
@@ -54,7 +56,6 @@ const App: React.FC = () => {
     const WEBHOOK_URL = 'https://n8n.srv941688.hstgr.cloud/webhook/e2c01e45-b40f-4331-9295-0c3f220eb89f';
     
     try {
-      // Standard fetch request
       const response = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: {
@@ -67,15 +68,12 @@ const App: React.FC = () => {
       }
       
       const rawData = await response.json();
-      
-      // Normalize data: Webhooks might return a single object or an array of objects
       const dataArray = Array.isArray(rawData) ? rawData : [rawData];
       
       if (dataArray.length === 0 || (dataArray.length === 1 && !dataArray[0])) {
         throw new Error('The database returned no valid data records.');
       }
 
-      // Map webhook data to Scenario objects using the specific keys: Talent_Pool, sum_Quantity
       const newScenarios: Scenario[] = dataArray.map((item: any, index: number) => {
         const poolName = item['Talent_Pool'] || item['talent pool'] || `Imported Pool ${index + 1}`;
         const totalHires = parseFloat(item['sum_Quantity']) || 0;
@@ -86,6 +84,7 @@ const App: React.FC = () => {
           demand: generateCurve('flat', config.hiringDuration, totalHires),
           color: COLORS[index % COLORS.length],
           currentTalentPartners: 0,
+          isManualTP: false,
         };
       });
 
@@ -94,9 +93,8 @@ const App: React.FC = () => {
       
     } catch (error: any) {
       console.error('Fetch Error:', error);
-      
       if (error.message === 'Failed to fetch') {
-        setSyncError('Connection blocked by CORS. Browsers prevent scripts from reading data from different domains unless the server explicitly allows it.');
+        setSyncError('Connection blocked by CORS or Network error.');
       } else {
         setSyncError(error.message);
       }
@@ -105,10 +103,54 @@ const App: React.FC = () => {
     }
   }, [config.hiringDuration]);
 
-  // Automatically trigger sync on mount
+  // Automatically trigger sync ONLY on mount
   useEffect(() => {
     handleSyncData();
-  }, [handleSyncData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Combined Resource Auto-Distribution Logic
+  useEffect(() => {
+    const individualResults = scenarios.map(s => calculateScenarioMetrics(s, config));
+    const aggregate = aggregateResults(individualResults, scenarios, config);
+    
+    // 1. Sourcer Auto-calc (Global)
+    if (!config.isManualSourcers) {
+      const suggestedSourcers = aggregate.maxSourcersNeeded;
+      if (config.totalSourcers !== suggestedSourcers) {
+        setConfig(prev => ({ ...prev, totalSourcers: suggestedSourcers }));
+      }
+    }
+
+    // 2. TP Auto-distribution (Per Pool)
+    const totalPeakNeeded = aggregate.maxTPsNeeded;
+    const totalDemand = scenarios.reduce((sum, s) => sum + s.demand.reduce((a, b) => a + b, 0), 0);
+
+    let needsUpdate = false;
+    const updatedScenarios = scenarios.map(s => {
+      if (s.isManualTP) return s;
+      const scenarioDemand = s.demand.reduce((a, b) => a + b, 0);
+      const suggestedTP = totalDemand > 0 ? (scenarioDemand / totalDemand) * totalPeakNeeded : 0;
+      
+      if (Math.abs(s.currentTalentPartners - suggestedTP) > 0.001) {
+        needsUpdate = true;
+        return { ...s, currentTalentPartners: suggestedTP };
+      }
+      return s;
+    });
+
+    if (needsUpdate) {
+      setScenarios(updatedScenarios);
+    }
+  }, [
+    config.hiringDuration, 
+    config.rampUpWeeks, 
+    config.tpCapacityPerWeek, 
+    config.poolsPerSourcer,
+    config.isManualSourcers,
+    scenarios.map(s => s.demand.join(',')).join('|'), 
+    scenarios.map(s => s.isManualTP).join(',')
+  ]);
 
   const calculatedResults = useMemo(() => {
     const individualResults = scenarios.map(s => ({
@@ -170,7 +212,7 @@ const App: React.FC = () => {
 
         <SettingsPanel config={config} onChange={setConfig} />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
           <MetricCard
             label="Total Hiring Demand"
             value={displayResult.totalDemand.toFixed(0)}
@@ -180,9 +222,17 @@ const App: React.FC = () => {
             bgColor="bg-brand-light/30"
           />
           <MetricCard
+            label="Talent Pools"
+            value={displayResult.totalPools}
+            subValue="Synced from DB"
+            icon={Database}
+            color="text-brand-dark"
+            bgColor="bg-indigo-50"
+          />
+          <MetricCard
             label="Peak Resources (TPs)"
             value={displayResult.maxTPsNeeded}
-            subValue={`Current: ${displayResult.currentTPs}`}
+            subValue={`Allocated: ${displayResult.currentTPs.toFixed(1)}`}
             icon={Users}
             color="text-brand-dark"
             bgColor="bg-slate-100"
@@ -190,7 +240,7 @@ const App: React.FC = () => {
           <MetricCard
             label="Peak Resources (Src)"
             value={displayResult.maxSourcersNeeded}
-            subValue={`Current: ${displayResult.currentSourcers}`}
+            subValue={`Allocated: ${displayResult.currentSourcers}`}
             icon={Search}
             color="text-brand-accent"
             bgColor="bg-yellow-50"
@@ -208,8 +258,8 @@ const App: React.FC = () => {
             value={`${displayResult.capacityGapPercent.toFixed(0)}%`}
             subValue={`Limited by ${displayResult.limitingFactor}`}
             icon={AlertTriangle}
-            color={displayResult.capacityGapPercent > 20 ? "text-red-500" : "text-emerald-500"}
-            bgColor={displayResult.capacityGapPercent > 20 ? "bg-red-50" : "bg-emerald-50"}
+            color={displayResult.capacityGapPercent > 1 ? "text-red-500" : "text-emerald-500"}
+            bgColor={displayResult.capacityGapPercent > 1 ? "bg-red-50" : "bg-emerald-50"}
           />
         </div>
 
