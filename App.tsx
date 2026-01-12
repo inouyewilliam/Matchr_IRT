@@ -7,6 +7,7 @@ import SettingsPanel from './components/SettingsPanel';
 import MetricCard from './components/MetricCard';
 import ChartSection from './components/ChartSection';
 import DataTable from './components/DataTable';
+import ScenarioComparison from './components/ScenarioComparison'; // Import the new component
 import { 
   PlusCircle, 
   Users, 
@@ -17,7 +18,8 @@ import {
   Loader2,
   RefreshCw,
   CalendarCheck,
-  Database
+  Database,
+  ArrowRightLeft
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -26,6 +28,9 @@ const App: React.FC = () => {
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  
+  // View state: 'dashboard' or 'comparison'
+  const [view, setView] = useState<'dashboard' | 'comparison'>('dashboard');
 
   const handleUpdateScenario = (updated: Scenario) => {
     setScenarios(scenarios.map(s => s.id === updated.id ? updated : s));
@@ -169,6 +174,20 @@ const App: React.FC = () => {
     ? scenarios.find(s => s.id === selectedScenarioId)?.name || 'Pool'
     : 'All Talent Pools';
 
+  // Render Comparison View if active
+  if (view === 'comparison') {
+    return (
+      <ScenarioComparison 
+        onBack={() => setView('dashboard')}
+        totalDemand={calculatedResults.aggregateResult.totalDemand}
+        hiringDuration={config.hiringDuration}
+        totalPools={calculatedResults.aggregateResult.totalPools}
+        currentConfig={config}
+      />
+    );
+  }
+
+  // Render Dashboard View
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <header className="bg-brand-primary border-b border-brand-dark sticky top-0 z-20 shadow-md">
@@ -180,6 +199,14 @@ const App: React.FC = () => {
              <h1 className="text-xl font-heading font-bold text-white tracking-wide">IRT Simulator</h1>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setView('comparison')}
+              className="group flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-sm active:scale-95 border border-white/10"
+            >
+              <ArrowRightLeft size={18} />
+              <span>Compare Scenarios</span>
+            </button>
+
             <button
               onClick={handleSyncData}
               disabled={isSyncing}
